@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>CRM to Books - Invoice Sync</title>
+
+    <script src="https://live.zwidgets.com/js-sdk/1.2/ZohoEmbededAppSDK.min.js"></script>
+
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: Arial, sans-serif;
+        background: #f5f7fb;
+        padding: 24px;
+        color: #202939;
+      }
+
+      .container {
+        max-width: 750px;
+        margin: auto;
+        background: white;
+        padding: 24px;
+        border-radius: 12px;
+        box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+      }
+
+      h2 {
+        margin-top: 0;
+      }
+
+      .status {
+        padding: 12px;
+        background: #eef2ff;
+        border-radius: 7px;
+        margin-bottom: 20px;
+      }
+
+      .section {
+        margin-top: 20px;
+      }
+
+      pre {
+        background: #172033;
+        color: #d6e2ff;
+        padding: 16px;
+        border-radius: 8px;
+        overflow: auto;
+        max-height: 350px;
+        white-space: pre-wrap;
+        word-break: break-word;
+        font-size: 12px;
+      }
+
+      .label {
+        font-weight: bold;
+        margin-bottom: 8px;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="container">
+      <h2>Zoho CRM → Zoho Books</h2>
+
+      <div class="status" id="status">Initializing Zoho CRM SDK...</div>
+
+      <div class="section">
+        <div class="label">Current CRM Module</div>
+        <div id="module">Waiting...</div>
+      </div>
+
+      <div class="section">
+        <div class="label">CRM Invoice ID</div>
+        <div id="recordId">Waiting...</div>
+      </div>
+
+      <div class="section">
+        <div class="label">PageLoad Response</div>
+        <pre id="pageData">Waiting for CRM context...</pre>
+      </div>
+
+      <div class="section">
+        <div class="label">Invoice Record JSON</div>
+        <pre id="invoiceData">Waiting for invoice data...</pre>
+      </div>
+    </div>
+
+    <script>
+      function showStatus(message) {
+        document.getElementById("status").textContent = message;
+      }
+
+      function displayJSON(elementId, data) {
+        document.getElementById(elementId).textContent = JSON.stringify(
+          data,
+          null,
+          4,
+        );
+      }
+
+      function handlePageLoad(pageData) {
+        console.log("CRM PageLoad:", pageData);
+
+        displayJSON("pageData", pageData);
+
+        const moduleName = pageData.Entity;
+        const entityId = pageData.EntityId;
+
+        document.getElementById("module").textContent =
+          moduleName || "Not available";
+
+        document.getElementById("recordId").textContent = Array.isArray(
+          entityId,
+        )
+          ? entityId.join(", ")
+          : entityId || "Not available";
+
+        if (moduleName !== "Invoices") {
+          showStatus("Please open a record in the Standard Invoices module.");
+          return;
+        }
+
+        if (!entityId || Array.isArray(entityId)) {
+          showStatus("A single invoice record ID was not received.");
+          return;
+        }
+
+        showStatus("Fetching invoice details from CRM...");
+
+        ZOHO.CRM.API.getRecord({
+          Entity: "Invoices",
+          RecordID: entityId,
+        })
+          .then(function (response) {
+            console.log("Invoice Record:", response);
+
+            displayJSON("invoiceData", response);
+
+            if (response.data && response.data.length > 0) {
+              showStatus("Successfully retrieved CRM invoice!");
+            } else {
+              showStatus("No invoice record returned. Check API permissions.");
+            }
+          })
+          .catch(function (error) {
+            console.error("CRM API Error:", error);
+
+            displayJSON("invoiceData", error);
+
+            showStatus("Failed to retrieve invoice. Check browser console.");
+          });
+      }
+
+      if (typeof ZOHO !== "undefined") {
+        ZOHO.embeddedApp.on("PageLoad", handlePageLoad);
+
+        ZOHO.embeddedApp
+          .init()
+          .then(function () {
+            showStatus("Zoho CRM SDK initialized. Waiting for CRM record...");
+            console.log("Zoho CRM SDK initialized.");
+          })
+          .catch(function (error) {
+            console.error("SDK initialization error:", error);
+            showStatus("SDK initialization failed. Check console.");
+          });
+      } else {
+        showStatus("Zoho CRM SDK not loaded.");
+      }
+    </script>
+  </body>
+</html>
